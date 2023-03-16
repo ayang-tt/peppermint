@@ -1,6 +1,7 @@
 import { createRequire } from 'module'
 import { TezosToolkit } from '@taquito/taquito'
 import { InMemorySigner } from '@taquito/signer'
+import { logger } from '../logger.mjs';
 
 const require = createRequire(import.meta.url);
 require('console-stamp')(console);
@@ -47,9 +48,9 @@ const init = async function(config) {
 
 	// try {
 	// 	let est = await tezos.estimate.transfer({ from: address, to: 'tz2KmhM6HHkBCRzN1mkyGfB1vTPid4PNvAbc', amount: 0.1});
-	// 	console.log(est);
+	// 	logger.info(est);
 	// } catch (err) {
-	// 	console.log(err);
+	// 	logger.info(err);
 	// }
 
 	let contract = await tezos.contract.at('KT1PptVxoGBiLbtJr2kzXeUsBc2qRAsM7HKS');
@@ -66,8 +67,8 @@ const init = async function(config) {
 		}];
 		let op = contract.methods.transfer(params).toTransferParams()
 		let est = await tezos.estimate.transfer(op);
-		console.log(est);
-		console.log({
+		logger.info(est);
+		logger.info({
 			burnFeeMutez: est.burnFeeMutez,
 			gasLimit: est.gasLimit,
 			minimalFeeMutez: est.minimalFeeMutez,
@@ -76,16 +77,16 @@ const init = async function(config) {
 			totalCost: est.totalCost,
 			usingBaseFeeMutez: est.usingBaseFeeMutez});
 		op = set_better_limits(op, est);
-		console.log(JSON.stringify(op));
+		logger.info(JSON.stringify(op));
 		let rec = await tezos.wallet.transfer(op).send();
-		console.log(rec.opHash);
+		logger.info(rec.opHash);
 		let rec2 = await rec.confirmation(2);
-		console.log(JSON.stringify(rec2));
+		logger.info(JSON.stringify(rec2));
 	} catch (err) {
-		console.log(err);
+		logger.info(err);
 	}
 }
 
 let config = require('./config.json');
-console.log("Starting with configuration:\n", config);
+logger.info(`Starting with configuration:\n${config}`);
 init(config);

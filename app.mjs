@@ -10,6 +10,7 @@ import MultiassetHandler from './operations/nft-multiasset.mjs'
 import TezHandler from './operations/tez.mjs'
 import ConfLoader from './confloader.mjs'
 import ProcMgr from './procmgr.mjs'
+import { logger } from './logger.mjs';
 
 const Handlers = {
 	MultiassetHandler,
@@ -18,7 +19,6 @@ const Handlers = {
 
 const require = createRequire(import.meta.url);
 const promptly = require('promptly');
-require('console-stamp')(console);
 const config = ConfLoader();
 
 const get_signing_key = async function(config) {
@@ -54,9 +54,9 @@ const main = async function() {
   const tezos = new TezosToolkit(config.rpcUrl);
 
   const signer = await get_signing_key(config)
-  console.log("signer: " + signer);
+  logger.info("signer: " + signer);
   const address = await signer.publicKeyHash();
-  console.log("Signer initialized for originating address ", address);
+  logger.info(`Signer initialized for originating address ${address}`);
 	tezos.setSignerProvider(signer);
 
 	const procmgr = ProcMgr({ db: queue, originator: address, config });
@@ -76,16 +76,18 @@ const main = async function() {
 				return handling_function(command.args, batch);
 			}
 		}
-		console.warn("Invalid comand:", JSON.stringify(command));
+		logger.warn(`Invalid comand: ${JSON.stringify(command)}`);
 		return false;
 	}
 
 	const update_last_pull = function() {
-		queue.update_last_pull({ originator: address, process_uuid }).catch(() => { console.error("Database error when updating last pull epoch"); });
+		queue.update_last_pull({ originator: address, process_uuid }).catch(() => { logger.error("Database error when updating last pull epoch"); });
 	}
 
 	const save_state_async = function(ids, state) {
-		queue.save_state(ids, state).catch((err) => { console.error("Database error when setting", state, "on operation with ids:", JSON.stringify(ids)); });;
+		queue.save_state(ids, state).catch((err) => {
+			logger.error(`Database error when setting ${state} on operation with ids: ${JSON.stringify(ids)}`);
+		});;
 	}
 
 	const health_check = async function() {
@@ -94,7 +96,7 @@ const main = async function() {
 			let mutez_supply = await tezos.tz.getBalance(address);
 			tez_supply = mutez_supply.shiftedBy(-6).toNumber();
 		} catch (err) {
-			console.log("An error has occurred while attempting to get tez balance; the node may be down or inaccessible.\n", err);
+			logger.info(`An error has occurred while attempting to get tez balance; the node may be down or inaccessible.\n${err}`);
 			return false;
 		}
 
@@ -104,7 +106,7 @@ const main = async function() {
 			await queue.kill_canaries(address);
 		} else {
 			await queue.add_balance_warning({ originator: address, process_uuid, tez_supply });
-			console.warn(`Tez balance on account ${address} below warning threshold`);
+			logger.warn(`Tez balance on account ${address} below warning threshold`);
 		}
 
 		return true;
@@ -117,11 +119,11 @@ const main = async function() {
 
 		let ops = await queue.checkout(address, ~~(config.batchSize/batch_divider) + 1);
 		if (ops.length == 0) {
-			console.log("No pending operations for originator", address);
+			logger.info(`No pending operations for originator ${address}`);
 			return true;
 		}
 
-		console.log("Generating batch with", ops.length, "operations.")
+		logger.info(`Generating batch with ${ops.length} operations.`)
 		let batch = tezos.wallet.batch();
 		let batched_ids = [];
 		let rejected_ids = [];
@@ -136,34 +138,36 @@ const main = async function() {
 
 		// Ideally the handlers should have filtered out obviously bad ops
 		if (rejected_ids.length > 0) {
-			console.warn('Rejected operations with ids:', JSON.stringify(rejected_ids));
+			logger.warn(`Rejected operations with ids: ${JSON.stringify(rejected_ids)}`);
 			save_state_async(rejected_ids, queue.state.REJECTED);
 		}
 		if (batched_ids.length == 0) {
-			console.log("No valid operations left, aborting batch.");
+			logger.info("No valid operations left, aborting batch.");
 			return true;
 		}
 
-		console.log("Attempting to send operation group containing operations with ids:", JSON.stringify(batched_ids));
+		logger.info(`Attempting to send operation group containing operations with ids: ${JSON.stringify(batched_ids)}`);
 		try {
 			let sent_operation = await batch.send();
 			let op_hash = sent_operation.opHash;
-			console.log("Sent operation group with hash", op_hash, "containing operations with ids:", JSON.stringify(batched_ids));
+			logger.info(`Sent operation group with hash ${op_hash} containing operations with ids: ${JSON.stringify(batched_ids)}`);
 
 			// Save operation group hash - async because it's okay if it happens later
-			queue.save_sent(batched_ids, sent_operation.opHash).catch( (err) => { console.error("Database error when writing hash", sent_operation.opHash, "to sent operations with ids:", JSON.stringify(batched_ids)); } );
+			queue.save_sent(batched_ids, sent_operation.opHash).catch( (err) => {
+				logger.error(`Database error when writing hash ${sent_operation.opHash} to sent operations with ids: ${JSON.stringify(batched_ids)}`);
+			} );
 
 			// Wait for it to be baked
 			let result = await sent_operation.confirmation(config.confirmations, config.timeout);
 			if (result.completed) {
-				console.log("Operation group with hash", op_hash, "has been successfully confirmed.");
+				logger.info(`Operation group with hash ${op_hash} has been successfully confirmed.`);
 				save_state_async(batched_ids, queue.state.CONFIRMED); // save state
 				batch_divider = 1; // reset batch divider
 				return true;
 			} else {
 				// FIXME: Taquito .confirmation() gives us some interesting and underdocumented results
 				// it should be possible to prepare for chain reorgs based on it
-				console.error("Operation group with hash", op_hash, "has failed on chain.")
+				logger.error(`Operation group with hash ${op_hash} has failed on chain.`)
 				save_state_async(batched_ids, queue.state.FAILED);
 			}
 		} catch (err) {
@@ -186,26 +190,26 @@ const main = async function() {
 						// Account has no tez in it
 					case "storage_exhausted.operation":
 						// There seems to be a bug in the node that may give this error when the account is low on tez
-						console.warn("Retriable Tezos error encountered:\n", tezos_error, "\nRetrying operations with ids:", JSON.stringify(batched_ids));
+						logger.warn(`Retriable Tezos error encountered:\n${tezos_error}\nRetrying operations with ids: ${JSON.stringify(batched_ids)}`);
 						await queue.save_state(batched_ids, queue.state.PENDING);
 						break;
 					case "michelson_v1.script_rejected":
 						// The call failed on some business logic check in the contract
 					default:
 						// Everything else
-						console.error("Non-retriable Tezos error encountered:\n", tezos_error, "\nRejecting operations with ids:", JSON.stringify(batched_ids));
+						logger.error(`Non-retriable Tezos error encountered:\n${tezos_error}\nRejecting operations with ids:${JSON.stringify(batched_ids)}`);
 						save_state_async(batched_ids, queue.state.REJECTED);
 				}
 				return true;
 			}
-			console.error("An unhandled error has occurred when processing operations with ids:", JSON.stringify(batched_ids), "\n", err, "\nOperation group state unknown.");
+			logger.error(`An unhandled error has occurred when processing operations with ids: ${JSON.stringify(batched_ids)}\n${err}\nOperation group state unknown.`);
 			save_state_async(batched_ids, queue.state.UNKNOWN);
 			return true;
 		}
 	};
 
 	asyncExitHook(() => {
-		console.log("Attempting clean exit...");
+		logger.info("Attempting clean exit...");
 		return procmgr.unregister();
 	}, { minimumWait: 1000 });
 
@@ -220,4 +224,4 @@ const main = async function() {
 
 };
 
-main().then(() => { console.log("bye!"); }).catch((err) => { console.log("An error has ocurred outside the main event loop.\n", err) });
+main().then(() => { logger.info("bye!"); }).catch((err) => { logger.info(`An error has ocurred outside the main event loop.\n${err}`) });

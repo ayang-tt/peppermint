@@ -1,8 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from './logger.mjs';
 
 export default function({ db, originator, config }) {
   let process_uuid = uuidv4();
-  console.log("Process UUID:", process_uuid);
+  logger.info(`Process UUID: ${process_uuid}`);
 
   const register = async function() {
     let registered = false;
@@ -12,9 +13,9 @@ export default function({ db, originator, config }) {
         new Promise(_ => setTimeout(_, config.pollingDelay))
       ]);
       if (!result) {
-        console.log(`Process lock detected on originator ${originator}; will retry...`);
+        logger.info(`Process lock detected on originator ${originator}; will retry...`);
       } else {
-        console.log(`Process lock acquired for originator ${originator}`);
+        logger.info(`Process lock acquired for originator ${originator}`);
         registered = true;
       }
     }
