@@ -118,10 +118,11 @@ const main = async function() {
 		}
 
 		let state_counts = await queue.count_states(address);
-		Object.values(queue.state).forEach(state => {
+		let counts = Object.values(queue.state).map(state => {
 			const count = state_counts.rows.find(r => r.state == state)?.count || 0;
-			logger.info(`Originator ${address} has ${count} ${state.toUpperCase()} operations`)
-		})
+			return `${count} ${state.toUpperCase()}`
+		}).join(', ')
+		logger.info(`Originator ${address} has ${counts} operations`)
 
 		let ops = await queue.checkout(address, ~~(config.batchSize/batch_divider) + 1);
 		if (ops.length == 0) {
