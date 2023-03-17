@@ -117,6 +117,12 @@ const main = async function() {
 			return true;
 		}
 
+		let state_counts = await queue.count_states(address);
+		Object.values(queue.state).forEach(state => {
+			const count = state_counts.rows.find(r => r.state == state)?.count || 0;
+			logger.info(`Originator ${address} has ${count} ${state.toUpperCase()} operations`)
+		})
+
 		let ops = await queue.checkout(address, ~~(config.batchSize/batch_divider) + 1);
 		if (ops.length == 0) {
 			logger.info(`No pending operations for originator ${address}`);
