@@ -1,3 +1,4 @@
+import { logger } from "../logger.mjs";
 //const example_1 = '[{"kind":"temporary","id":"failure","msg":"Error while applying operation ooSDQwbdToAQA83324mN26j4Mnp4hAyroq8NCk3PuFRTJ8XiQQu:\\nbranch delayed (Error:\\n                  { \\"id\\": \\"proto.010-PtGRANAD.gas_exhausted.block\\",\\n  \\"description\\":\\n    \\"The sum of gas consumed by all the operations in the block exceeds the hard gas limit per block\\",\\n  \\"data\\": {} }\\n)"}]\n'
 //const example_2 = '[{"kind":"permanent","id":"node.prevalidation.oversized_operation","size":139096,"max_size":32768}]\n';
 
@@ -12,7 +13,7 @@ const parse_error_object = function(err) {
 		try {
 			json_part = JSON.parse(json_part);
 		} catch {
-			console.debug("Error while parsing node error message:", err);
+			logger.debug(`Error while parsing node error message: ${err}`);
 			return null;
 		}
 		return Object.assign(json_part, { container: err });
@@ -44,7 +45,7 @@ export const parse_rpc_error = function(text_body) {
 				}
 		}
 	} catch (err) {
-		console.debug("Error while parsing error message:", err);
+		logger.debug(`Error while parsing error message: ${err}`);
 		return null;
 	}
 }
