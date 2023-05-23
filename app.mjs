@@ -8,12 +8,14 @@ import Queue from './queue.mjs'
 import { parse_rpc_error, postprocess_error_object } from './errorhandler/tezos_error.mjs'
 import MultiassetHandler from './operations/nft-multiasset.mjs'
 import TezHandler from './operations/tez.mjs'
+import MulticontractHandler from './operations/nft-multicontract.mjs'
 import ConfLoader from './confloader.mjs'
 import ProcMgr from './procmgr.mjs'
 import { logger } from './logger.mjs';
 
 const Handlers = {
 	MultiassetHandler,
+	MulticontractHandler,
 	TezHandler
 }
 
@@ -68,11 +70,14 @@ const main = async function() {
 		handlers[key] = await (Handlers[val.handler](tezos, val.args));
 	}
 
-	const dispatch_command = function(command, batch) {
+	const dispatch_command = async function(command, batch) {
 		let handler = handlers[command.handler];
 		if (handler) {
 			let handling_function = handler[command.name];
 			if (handling_function) {
+				if (handling_function.constructor.name == 'AsyncFunction') {
+					return await handling_function(command.args, batch);
+				}
 				return handling_function(command.args, batch);
 			}
 		}
@@ -134,8 +139,8 @@ const main = async function() {
 		let batch = tezos.wallet.batch();
 		let batched_ids = [];
 		let rejected_ids = [];
-		await Promise.all(ops.map((operation) => {
-			let success = dispatch_command(operation.command, batch);
+		await Promise.all(ops.map(async (operation) => {
+			let success = await dispatch_command(operation.command, batch);
 			if (success) {
 				batched_ids.push(operation.id);
 			} else {
