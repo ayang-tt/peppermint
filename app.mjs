@@ -209,7 +209,7 @@ const main = async function() {
 						// The call failed on some business logic check in the contract
 					default:
 						// Everything else
-						logger.error(`Non-retriable Tezos error encountered:\n${tezos_error}\nRejecting operations with ids:${JSON.stringify(batched_ids)}`);
+						logger.error(`Non-retriable Tezos error encountered:\n${JSON.stringify(tezos_error)}\nRejecting operations with ids:${JSON.stringify(batched_ids)}`);
 						save_state_async(batched_ids, queue.state.REJECTED);
 				}
 				return true;

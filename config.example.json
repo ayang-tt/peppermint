@@ -24,7 +24,8 @@
 		"nft-multicontract": {
 			"handler": "MulticontractHandler",
 			"args": {
-				"storageLimit": 100
+				"storageLimit": 1000,
+				"gasLimit": 3000
 			}
 		},
 		"nft": {
