@@ -23,6 +23,7 @@ export default async function (tezos, { gasLimit, storageLimit }) {
   };
 
   const op_to_transfer = async function (op) {
+    /*
     let estimate = null;
     try {
       estimate = await tezos.estimate.transfer(op.toTransferParams());
@@ -33,6 +34,8 @@ export default async function (tezos, { gasLimit, storageLimit }) {
       gasLimit: Math.max(estimate?.gasLimit ?? 0, gasLimit ?? 0),
       storageLimit: Math.max(estimate?.storageLimit ?? 0, storageLimit ?? 0),
     });
+    */
+    const params = op.toTransferParams();
     logger.info(`transfer params: ${JSON.stringify(params)}`);
     return params;
   };
