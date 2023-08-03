@@ -21,6 +21,13 @@
  		"database": "tezos"
 	},
 	"handlers": {
+		"nft-multicontract": {
+			"handler": "MulticontractHandler",
+			"args": {
+				"storageLimit": 1000,
+				"gasLimit": 3000
+			}
+		},
 		"nft": {
 			"handler": "MultiassetHandler",
 			"args": {
