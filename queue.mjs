@@ -1,88 +1,116 @@
-import { createRequire } from 'module'
+import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 
-const { Pool } = require('pg');
+const { Pool } = require("pg");
 
-//const GET_PENDING_SQL = "SELECT * FROM operations WHERE state = 'pending' AND originator = $1 ORDER BY submitted_at ASC LIMIT $2"
-const GET_STATE_COUNTS_SQL = "select count(*) as count, state from peppermint.operations o where o.originator = $1 group by state"
-const CHECKOUT_SQL = "WITH cte AS (SELECT id FROM peppermint.operations WHERE state='pending' AND originator=$1 ORDER BY id ASC LIMIT $2) UPDATE peppermint.operations AS op SET state = 'processing' FROM cte WHERE cte.id = op.id RETURNING *";
-const SENT_SQL = "UPDATE peppermint.operations SET included_in = $1 WHERE id = ANY($2)";
-const SET_STATE_SQL = "UPDATE peppermint.operations SET state = $1 WHERE id = ANY($2)";
+// const GET_PENDING_SQL = "SELECT * FROM operations WHERE state = 'pending' AND originator = $1 ORDER BY submitted_at ASC LIMIT $2"
+const GET_STATE_COUNTS_SQL =
+  "select count(*) as count, state from peppermint.operations o where o.originator = $1 group by state";
+const GET_DISTINCT_OPHASH_SQL =
+  "select distinct (o.included_in) as ophash from peppermint.operations o where o.originator = $1 and o.included_in != '' and o.last_updated_at > NOW() - interval '20 minutes' and o.last_updated_at < NOW() - interval '10 minutes'";
+const CHECKOUT_SQL =
+  "WITH cte AS (SELECT id FROM peppermint.operations WHERE state='pending' AND originator=$1 ORDER BY id ASC LIMIT $2) UPDATE peppermint.operations AS op SET state = 'processing' FROM cte WHERE cte.id = op.id RETURNING *";
+const SENT_SQL =
+  "UPDATE peppermint.operations SET included_in = $1 WHERE id = ANY($2)";
+const SET_STATE_SQL =
+  "UPDATE peppermint.operations SET state = $1 WHERE id = ANY($2)";
 
-const KILL_CANARIES_SQL = "DELETE FROM peppermint.operations WHERE state='canary' AND originator = $1";
+const KILL_CANARIES_SQL =
+  "DELETE FROM peppermint.operations WHERE state='canary' AND originator = $1";
 
-const REGISTER_PROCESS_SQL = "INSERT INTO peppermint.processes (originator, process_uuid) VALUES ($1, $2) ON CONFLICT DO NOTHING";
-const UNREGISTER_PROCESS_SQL = "DELETE FROM peppermint.processes WHERE originator=$1 AND process_uuid=$2";
+const REGISTER_PROCESS_SQL =
+  "INSERT INTO peppermint.processes (originator, process_uuid) VALUES ($1, $2) ON CONFLICT DO NOTHING";
+const UNREGISTER_PROCESS_SQL =
+  "DELETE FROM peppermint.processes WHERE originator=$1 AND process_uuid=$2";
 
-const UPDATE_LAST_PULL = "UPDATE peppermint.processes SET messages = jsonb_set(messages, '{last_pull_at_epoch}', to_jsonb(ROUND(extract(epoch from now()::timestamptz) * 1000))) WHERE originator=$1 AND process_uuid=$2 RETURNING *";
-const ADD_BALANCE_WARNING = "UPDATE peppermint.processes SET messages = jsonb_set(messages, '{balance_warning}', to_jsonb($3::TEXT)) WHERE originator=$1 AND process_uuid=$2";
-const REMOVE_BALANCE_WARNING = "UPDATE peppermint.processes SET messages = messages - 'balance_warning' WHERE originator=$1 AND process_uuid=$2";
+const UPDATE_LAST_PULL =
+  "UPDATE peppermint.processes SET messages = jsonb_set(messages, '{last_pull_at_epoch}', to_jsonb(ROUND(extract(epoch from now()::timestamptz) * 1000))) WHERE originator=$1 AND process_uuid=$2 RETURNING *";
+const ADD_BALANCE_WARNING =
+  "UPDATE peppermint.processes SET messages = jsonb_set(messages, '{balance_warning}', to_jsonb($3::TEXT)) WHERE originator=$1 AND process_uuid=$2";
+const REMOVE_BALANCE_WARNING =
+  "UPDATE peppermint.processes SET messages = messages - 'balance_warning' WHERE originator=$1 AND process_uuid=$2";
 
-export default function(db_connection) {
-	let pool = new Pool(db_connection);
+export default function (db_connection) {
+  let pool = new Pool(db_connection);
 
-	const count_states = function(originator) {
-		return pool.query(GET_STATE_COUNTS_SQL, [ originator ]);
-	};
+  const count_states = function (originator) {
+    return pool.query(GET_STATE_COUNTS_SQL, [originator]);
+  };
 
-	const save_state = async function(ids, state) {
-		return pool.query(SET_STATE_SQL, [ state, ids ]);
-	};
+  const get_distinct_ophash = function (originator) {
+    return pool.query(GET_DISTINCT_OPHASH_SQL, [originator]);
+  };
 
-	const checkout = async function(originator, limit) {
-		let result = await pool.query(CHECKOUT_SQL, [originator, limit]);
-		return result.rows;
-	};
+  const save_state = async function (ids, state) {
+    return pool.query(SET_STATE_SQL, [state, ids]);
+  };
 
-	const save_sent = function(ids, op_hash) {
-		return pool.query(SENT_SQL, [op_hash, ids]);
-	};
+  const checkout = async function (originator, limit) {
+    let result = await pool.query(CHECKOUT_SQL, [originator, limit]);
+    return result.rows;
+  };
 
-	const kill_canaries = function(originator) {
-		return pool.query(KILL_CANARIES_SQL, [ originator ]);
-	};
+  const save_sent = function (ids, op_hash) {
+    return pool.query(SENT_SQL, [op_hash, ids]);
+  };
 
-	const register_process = async function({ originator, process_uuid }) {
-		let result = await pool.query(REGISTER_PROCESS_SQL, [ originator, process_uuid ]);
-		return result.rowCount;
-	};
+  const kill_canaries = function (originator) {
+    return pool.query(KILL_CANARIES_SQL, [originator]);
+  };
 
-	const unregister_process = function({ originator, process_uuid }) {
-		return pool.query(UNREGISTER_PROCESS_SQL, [ originator, process_uuid ]);
-	};
+  const register_process = async function ({ originator, process_uuid }) {
+    let result = await pool.query(REGISTER_PROCESS_SQL, [
+      originator,
+      process_uuid,
+    ]);
+    return result.rowCount;
+  };
 
-	const update_last_pull = function({ originator, process_uuid }) {
-		return pool.query(UPDATE_LAST_PULL, [ originator, process_uuid ]);
-	}
+  const unregister_process = function ({ originator, process_uuid }) {
+    return pool.query(UNREGISTER_PROCESS_SQL, [originator, process_uuid]);
+  };
 
-	const add_balance_warning = function({ originator, process_uuid, tez_supply }) {
-		const warning_message = `Tez balance of ${tez_supply} on account ${originator} is below warning threshold`;
-		return pool.query(ADD_BALANCE_WARNING, [ originator, process_uuid, warning_message ])
-	}
+  const update_last_pull = function ({ originator, process_uuid }) {
+    return pool.query(UPDATE_LAST_PULL, [originator, process_uuid]);
+  };
 
-	const remove_balance_warning = function({ originator, process_uuid }) {
-		return pool.query(REMOVE_BALANCE_WARNING, [ originator, process_uuid ])
-	}
+  const add_balance_warning = function ({
+    originator,
+    process_uuid,
+    tez_supply,
+  }) {
+    const warning_message = `Tez balance of ${tez_supply} on account ${originator} is below warning threshold`;
+    return pool.query(ADD_BALANCE_WARNING, [
+      originator,
+      process_uuid,
+      warning_message,
+    ]);
+  };
 
-	const state = {
-		PENDING: 'pending',
-		CONFIRMED: 'confirmed',
-		FAILED: 'failed',
-		UNKNOWN: 'unknown',
-		REJECTED: 'rejected'
-	};
+  const remove_balance_warning = function ({ originator, process_uuid }) {
+    return pool.query(REMOVE_BALANCE_WARNING, [originator, process_uuid]);
+  };
 
-	return {
-			checkout,
-			save_sent,
-			count_states,
-			save_state,
-			kill_canaries,
-			register_process,
-			unregister_process,
-			update_last_pull,
-			add_balance_warning,
-			remove_balance_warning,
-			state
-	};
+  const state = {
+    PENDING: "pending",
+    CONFIRMED: "confirmed",
+    FAILED: "failed",
+    UNKNOWN: "unknown",
+    REJECTED: "rejected",
+  };
+
+  return {
+    checkout,
+    save_sent,
+    count_states,
+    save_state,
+    kill_canaries,
+    register_process,
+    unregister_process,
+    update_last_pull,
+    add_balance_warning,
+    remove_balance_warning,
+    get_distinct_ophash,
+    state,
+  };
 }

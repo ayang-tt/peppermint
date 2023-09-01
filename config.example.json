@@ -1,42 +1,43 @@
 {
-	"batchSize": 110,
-	"confirmations": 1,
-	"remoteSigner": {
-		"pkh": "tz1somethingsomething",
-		"rootUrl": "http://127.0.0.1:8000",
-		"headers": {
-			"x-api-key": "supersecureapikey"
-		}
-	},
-	"privateKey": "edsksomethingsomething",
-	"rpcUrl": "https://ghostnet.ecadinfra.com/",
-	"pollingDelay": 10000,
-	"timeout": 300,
-	"warnBelowTez": 10.0,
-	"dbConnection": {
-		"user": "tezos",
-		"password": "tezos",
- 		"host": "localhost",
- 		"port": 5432,
- 		"database": "tezos"
-	},
-	"handlers": {
-		"nft-multicontract": {
-			"handler": "MulticontractHandler",
-			"args": {
-				"storageLimit": 1000,
-				"gasLimit": 3000
-			}
-		},
-		"nft": {
-			"handler": "MultiassetHandler",
-			"args": {
-				"contract_address": "KT1Ag9fR8mUxYHxx3pWNwvbpFyugFq7fKfQ9"
-			}
-		},
-		"tez": {
-			"handler": "TezHandler",
-			"args": {}
-		}
-	}
+  "batchSize": 110,
+  "confirmations": 1,
+  "remoteSigner": {
+    "pkh": "tz1somethingsomething",
+    "rootUrl": "http://127.0.0.1:8000",
+    "headers": {
+      "x-api-key": "supersecureapikey"
+    }
+  },
+  "privateKey": "edsksomethingsomething",
+  "rpcUrl": "https://ghostnet.ecadinfra.com/",
+  "tzktUrl": "https://api.ghostnet.tzkt.io",
+  "pollingDelay": 10000,
+  "timeout": 300,
+  "warnBelowTez": 10.0,
+  "dbConnection": {
+    "user": "tezos",
+    "password": "tezos",
+    "host": "localhost",
+    "port": 5432,
+    "database": "tezos"
+  },
+  "handlers": {
+    "nft-multicontract": {
+      "handler": "MulticontractHandler",
+      "args": {
+        "storageLimit": 1000,
+        "gasLimit": 3000
+      }
+    },
+    "nft": {
+      "handler": "MultiassetHandler",
+      "args": {
+        "contract_address": "KT1Ag9fR8mUxYHxx3pWNwvbpFyugFq7fKfQ9"
+      }
+    },
+    "tez": {
+      "handler": "TezHandler",
+      "args": {}
+    }
+  }
 }
