@@ -8,6 +8,8 @@ const GET_STATE_COUNTS_SQL =
   "select count(*) as count, state from peppermint.operations o where o.originator = $1 group by state";
 const GET_DISTINCT_OPHASH_SQL =
   "select distinct (o.included_in) as ophash from peppermint.operations o where o.originator = $1 and o.included_in != '' and o.last_updated_at > NOW() - interval '20 minutes' and o.last_updated_at < NOW() - interval '10 minutes'";
+const RESET_STATE_BY_OPHASH_SQL =
+  "UPDATE peppermint.operations SET state = 'pending' and included_in = '' WHERE originator = $1 AND included_in = $2";
 const CHECKOUT_SQL =
   "WITH cte AS (SELECT id FROM peppermint.operations WHERE state='pending' AND originator=$1 ORDER BY id ASC LIMIT $2) UPDATE peppermint.operations AS op SET state = 'processing' FROM cte WHERE cte.id = op.id RETURNING *";
 const SENT_SQL =
@@ -39,6 +41,10 @@ export default function (db_connection) {
 
   const get_distinct_ophash = function (originator) {
     return pool.query(GET_DISTINCT_OPHASH_SQL, [originator]);
+  };
+
+  const reset_state_by_ophash = function (originator, ophash) {
+    return pool.query(RESET_STATE_BY_OPHASH_SQL, [originator, ophash]);
   };
 
   const save_state = async function (ids, state) {
@@ -111,6 +117,7 @@ export default function (db_connection) {
     add_balance_warning,
     remove_balance_warning,
     get_distinct_ophash,
+    reset_state_by_ophash,
     state,
   };
 }

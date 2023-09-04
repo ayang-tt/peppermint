@@ -162,6 +162,7 @@ const main = async function () {
         ).data;
 
         const is_applied =
+          tzkt_response.length > 0 &&
           tzkt_response.map((x) => x.status).filter((x) => x != "applied")
             .length == 0;
 
@@ -171,6 +172,7 @@ const main = async function () {
           logger.error(
             `op hash ${ophash} is not applied: ${JSON.stringify(tzkt_response)}`
           );
+          await queue.reset_state_by_ophash(address, ophash);
         }
       } catch (err) {
         logger.error(`Failed to check op hash ${ophash}: ${err}`);
